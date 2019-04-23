@@ -10,6 +10,20 @@ from .alias_multinomial import AliasMultinomial
 # A backoff probability to stabilize log operation
 BACKOFF_PROB = 1e-10
 
+ce_loss_fn = nn.CrossEntropyLoss(reduction='none')
+nll_loss_fn = nn.NLLLoss(reduction='none')
+
+def povey_loss_fn(scores, output):
+#    print (scores.shape, output.shape)
+#    print (scores, output)
+    ce_loss = ce_loss_fn(scores, output)
+    nll_loss = nll_loss_fn(scores, output)
+    exp_part = ce_loss - nll_loss
+    exp_exp_part = torch.exp(exp_part)
+    loss = nll_loss + exp_exp_part - 1
+#    loss = torch.sum(nll_loss + exp_exp_part - 1)
+#    print (loss)
+    return loss
 
 class NCELoss(nn.Module):
     """Noise Contrastive Estimation
@@ -74,6 +88,8 @@ class NCELoss(nn.Module):
         self.per_word = per_word
         self.bce = nn.BCELoss(reduction='none')
         self.ce = nn.CrossEntropyLoss(reduction='none')
+        self.nll = nn.NLLLoss(reduction='none')
+        self.povey = povey_loss_fn
         self.loss_type = loss_type
 
     def forward(self, target, *args, **kwargs):
@@ -87,9 +103,7 @@ class NCELoss(nn.Module):
         batch = target.size(0)
         max_len = target.size(1)
         if self.loss_type != 'full':
-
             noise_samples = self.get_noise(batch, max_len)
-
             # B,N,Nr
             prob_noise = Variable(
                 self.noise[noise_samples.data.view(-1)].view_as(noise_samples)
@@ -97,7 +111,6 @@ class NCELoss(nn.Module):
             prob_target_in_noise = Variable(
                 self.noise[target.data.view(-1)].view_as(target)
             )
-
             # (B,N), (B,N,Nr)
             prob_model, prob_noise_in_model = self._get_prob(target, noise_samples, *args, **kwargs)
 
@@ -115,6 +128,11 @@ class NCELoss(nn.Module):
                     prob_model, prob_noise_in_model,
                     prob_noise, prob_target_in_noise,
                 )
+            elif self.loss_type == 'sampled_povey':
+                loss = self.sampled_povey_loss(
+                    prob_model, prob_noise_in_model,
+                    prob_noise, prob_target_in_noise,
+                )
             elif self.loss_type == 'mix' and self.training:
                 loss = 0.5 * self.nce_loss(
                     prob_model, prob_noise_in_model,
@@ -124,12 +142,15 @@ class NCELoss(nn.Module):
                     prob_model, prob_noise_in_model,
                     prob_noise, prob_target_in_noise,
                 )
+            elif self.loss_type == 'povey':
+                # Fallback into conventional cross entropy
+                loss = self.povey_loss(target, *args, **kwargs)
 
             else:
                 current_stage = 'training' if self.training else 'inference'
                 raise NotImplementedError('loss type {} not implemented at {}'.format(self.loss_type, current_stage))
 
-        else:
+        elif self.loss_type == 'full':
             # Fallback into conventional cross entropy
             loss = self.ce_loss(target, *args, **kwargs)
 
@@ -139,6 +160,33 @@ class NCELoss(nn.Module):
             return loss.sum()
         else:
             return loss
+
+    def forward_normalized(self, target, *args, **kwargs):
+        """compute the loss with output and the desired target
+
+        The `forward` is the same among all NCELoss submodules, it
+        takes care of generating noises and calculating the loss
+        given target and noise scores.
+        """
+
+        batch = target.size(0)
+        max_len = target.size(1)
+        ce_loss = self.ce_loss(target, *args, **kwargs)
+        nll_loss = self.nll_loss(target, *args, **kwargs)
+        return ce_loss, nll_loss
+
+    def fast_normalized(self, target, *args, **kwargs):
+        """compute the loss with output and the desired target
+
+        The `forward` is the same among all NCELoss submodules, it
+        takes care of generating noises and calculating the loss
+        given target and noise scores.
+        """
+
+        batch = target.size(0)
+        max_len = target.size(1)
+        loss = self.nll_loss(target, *args, **kwargs)
+        return loss
 
     def get_noise(self, batch_size, max_len):
         """Generate noise samples from noise distribution"""
@@ -229,6 +277,20 @@ class NCELoss(nn.Module):
         logits = logits - q_logits
         labels = torch.zeros_like(logits.narrow(2, 0, 1)).squeeze(2).long()
         loss = self.ce(
+            logits.view(-1, logits.size(-1)),
+            labels.view(-1),
+        ).view_as(labels)
+
+        return loss
+
+    def sampled_povey_loss(self, prob_model, prob_noise_in_model, prob_noise, prob_target_in_noise):
+        """Compute the sampled softmax loss based on the tensorflow's impl"""
+        logits = torch.cat([prob_model.unsqueeze(2), prob_noise_in_model], dim=2).clamp_min(BACKOFF_PROB).log()
+        q_logits = torch.cat([prob_target_in_noise.unsqueeze(2), prob_noise], dim=2).clamp_min(BACKOFF_PROB).log()
+        # subtract Q for correction of biased sampling
+        logits = logits - q_logits
+        labels = torch.zeros_like(logits.narrow(2, 0, 1)).squeeze(2).long()
+        loss = self.povey(
             logits.view(-1, logits.size(-1)),
             labels.view(-1),
         ).view_as(labels)

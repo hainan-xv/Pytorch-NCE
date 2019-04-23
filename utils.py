@@ -31,7 +31,7 @@ def setup_parser():
                         help='initial weight decay')
     parser.add_argument('--lr-decay', type=float, default=2,
                         help='learning rate decay when no progress is observed on validation set')
-    parser.add_argument('--clip', type=float, default=0.25,
+    parser.add_argument('--clip', type=float, default=5,
                         help='gradient clipping')
     parser.add_argument('--epochs', type=int, default=40,
                         help='upper epoch limit')
@@ -55,7 +55,7 @@ def setup_parser():
     parser.add_argument('--noise-ratio', type=int, default=50,
                         help='set the noise ratio of NCE sampling, the noise'
                         ' is shared among batch')
-    parser.add_argument('--norm-term', type=int, default=-1,
+    parser.add_argument('--norm-term', type=int, default=1,
                         help='set the log normalization term of NCE sampling')
     parser.add_argument('--train', action='store_true',
                         help='set train mode, otherwise only evaluation is'

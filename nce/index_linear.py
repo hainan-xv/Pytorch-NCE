@@ -39,7 +39,7 @@ class IndexLinear(NCELoss):
         self.emb.weight.data.uniform_(-stdv, stdv)
         if self.bias is not None:
             # initialize the bias with unigram instead of uniform
-            self.bias.weight.data = torch.log(self.noise + 1e-10) + self.norm_term
+            self.bias.weight.data = torch.log(self.noise + 1e-10) + self.norm_term - 9.0
             self.bias.weight.data.unsqueeze_(1)
 
     def get_score(self, target_idx, noise_idx, input):
@@ -141,6 +141,23 @@ class IndexLinear(NCELoss):
     def ce_loss(self, target_idx, input):
         score = F.linear(input, self.emb.weight, self.bias.weight.squeeze(1))  # (N, V)
         loss = self.ce(
+            score.view(-1, score.size(-1)),
+            target_idx.view(-1)
+        ).view_as(target_idx)
+        return loss
+
+    def povey_loss(self, target_idx, input):
+        score = F.linear(input, self.emb.weight, self.bias.weight.squeeze(1))  # (N, V)
+        loss = self.povey(
+            score.view(-1, score.size(-1)),
+            target_idx.view(-1)
+        ).view_as(target_idx)
+        return loss
+
+
+    def nll_loss(self, target_idx, input):
+        score = F.linear(input, self.emb.weight, self.bias.weight.squeeze(1))  # (N, V)
+        loss = self.nll(
             score.view(-1, score.size(-1)),
             target_idx.view(-1)
         ).view_as(target_idx)

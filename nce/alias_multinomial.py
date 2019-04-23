@@ -72,5 +72,6 @@ class AliasMultinomial(torch.nn.Module):
         oq = kk.mul(b)
         oj = alias.mul(1 - b)
 
-        return (oq + oj).view(size)
+        ret = (oq + oj).view(size)
+        return ret
 

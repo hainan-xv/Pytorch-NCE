@@ -37,7 +37,8 @@ corpus = data.Corpus(
     path=args.data,
     vocab_path=args.vocab,
     batch_size=args.batch_size,
-    shuffle=True,
+    shuffle=False,
+#    shuffle=True,
     pin_memory=args.cuda,
     min_freq=args.min_freq,
     concat=args.concat,
@@ -118,24 +119,27 @@ def train(model, data_source, epoch, lr=1.0, weight_decay=1e-5, momentum=0.9):
     # Turn on training mode which enables dropout.
     model.train()
     model.criterion.loss_type = args.loss
-    total_loss = 0
-    pbar = tqdm(data_source, desc='Training PPL: ....')
+    total_loss = 0.0
+#    pbar = tqdm(data_source, desc='Training PPL: ....')
+    pbar = data_source
+    total_num_words = 0.0
     for num_batch, data_batch in enumerate(pbar):
+        progress = num_batch / len(pbar) + epoch - 1
         optimizer.zero_grad()
         data, target, length = process_data(data_batch, cuda=args.cuda, sep_target=sep_target)
-        loss = model(data, target, length)
+        total_num_words += length.sum().item()
+        loss = model(data, target, length) # / total_num_words
         loss.backward()
 
         # `clip_grad_norm` helps prevent the exploding gradient problem in RNNs / LSTMs.
         torch.nn.utils.clip_grad_norm_(model.parameters(), args.clip)
         optimizer.step()
-
         total_loss += loss.item()
 
         if args.prof:
             break
         if num_batch % args.log_interval == 0 and num_batch > 0:
-            cur_loss = total_loss / args.log_interval
+            cur_loss = total_loss / total_num_words
             ppl = math.exp(cur_loss)
             logger.debug(
                 '| epoch {:3d} | {:5d}/{:5d} batches '
@@ -144,8 +148,10 @@ def train(model, data_source, epoch, lr=1.0, weight_decay=1e-5, momentum=0.9):
                     lr, cur_loss, ppl
                   )
             )
-            pbar.set_description('Training PPL %.1f' % ppl)
-            total_loss = 0
+            print('Progress %.4f, Training PPL %.4f' % (progress, ppl))
+#            pbar.set_description('Training PPL %.1f' % ppl)
+            total_loss = 0.0
+            total_num_words = 0.0
 
 def evaluate(model, data_source, cuda=args.cuda):
     # Turn on evaluation mode which disables dropout.
@@ -155,14 +161,21 @@ def evaluate(model, data_source, cuda=args.cuda):
     eval_loss = 0
     total_length = 0
 
+    t = 0.0
+
     with torch.no_grad():
         for data_batch in data_source:
             data, target, length = process_data(data_batch, cuda=cuda, sep_target=sep_target)
 
-            loss = model(data, target, length)
+            l1, l2 = model.forward_normalized(data, target, length)
             cur_length = int(length.data.sum())
-            eval_loss += loss.item() * cur_length
+            eval_loss += l1.sum().item()
+
+            t += torch.exp(l2 - l1).sum().item()
+
             total_length += cur_length
+
+    print ("average norm is", t / total_length)
 
     model.criterion.loss_type = args.loss
 
