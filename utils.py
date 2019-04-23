@@ -27,7 +27,7 @@ def setup_parser():
                         help='truncated bptt length')
     parser.add_argument('--concat', action='store_true',
                         help='Use concatenated sentences chunked into length of bptt')
-    parser.add_argument('--weight-decay', type=float, default=1e-5,
+    parser.add_argument('--weight-decay', type=float, default=0.0,
                         help='initial weight decay')
     parser.add_argument('--lr-decay', type=float, default=2,
                         help='learning rate decay when no progress is observed on validation set')

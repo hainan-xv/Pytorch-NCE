@@ -3,11 +3,11 @@
 loss=povey
 batch_size=64
 dropout=0.2
-noise_ratio=128
+noise_ratio=512
 
 . parse_options.sh
 
-export CUDA_VISIBLE_DEVICES=1
+export CUDA_VISIBLE_DEVICES=`free-gpu`
 
 dir=${loss}_${batch_size}_${dropout}_${noise_ratio}
 mkdir -p saved_model/$dir

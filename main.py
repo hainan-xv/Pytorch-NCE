@@ -161,7 +161,7 @@ def evaluate(model, data_source, cuda=args.cuda):
     eval_loss = 0
     total_length = 0
 
-    t = 0.0
+    t = tt = 0.0
 
     with torch.no_grad():
         for data_batch in data_source:
@@ -172,10 +172,13 @@ def evaluate(model, data_source, cuda=args.cuda):
             eval_loss += l1.sum().item()
 
             t += torch.exp(l2 - l1).sum().item()
+            tt += (torch.exp(l2 - l1) * torch.exp(l2 - l1)).sum().item()
 
             total_length += cur_length
 
-    print ("average norm is", t / total_length)
+    mean = t / total_length
+    variance = tt / total_length - mean * mean
+    print ("mean, variance is", mean, variance)
 
     model.criterion.loss_type = args.loss
 
