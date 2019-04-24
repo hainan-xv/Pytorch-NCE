@@ -108,14 +108,12 @@ sep_target = args.index_module == 'linear'
 # Training code
 #################################################################
 
+optimizer = optim.Adam(
+    params=model.parameters(),
+    lr=args.lr,
+)
 
 def train(model, data_source, epoch, lr=1.0, weight_decay=1e-5, momentum=0.9):
-    optimizer = optim.SGD(
-        params=model.parameters(),
-        lr=lr,
-        momentum=momentum,
-        weight_decay=weight_decay
-    )
     # Turn on training mode which enables dropout.
     model.train()
     model.criterion.loss_type = args.loss
@@ -140,7 +138,9 @@ def train(model, data_source, epoch, lr=1.0, weight_decay=1e-5, momentum=0.9):
             break
         if num_batch % args.log_interval == 0 and num_batch > 0:
             cur_loss = total_loss / total_num_words
-            ppl = math.exp(cur_loss)
+            ppl = 100000
+            if cur_loss < math.log(ppl):
+              ppl = math.exp(cur_loss)
             logger.debug(
                 '| epoch {:3d} | {:5d}/{:5d} batches '
                 '| lr {:02.2f} | loss {:5.2f} | ppl {:8.2f}'.format(
@@ -164,7 +164,7 @@ def evaluate(model, data_source, cuda=args.cuda):
     t = tt = 0.0
 
     with torch.no_grad():
-        for data_batch in data_source:
+        for data_batch in tqdm(data_source):
             data, target, length = process_data(data_batch, cuda=cuda, sep_target=sep_target)
 
             l1, l2 = model.forward_normalized(data, target, length)
@@ -172,30 +172,36 @@ def evaluate(model, data_source, cuda=args.cuda):
             eval_loss += l1.sum().item()
 
             t += torch.exp(l2 - l1).sum().item()
-            tt += (torch.exp(l2 - l1) * torch.exp(l2 - l1)).sum().item()
+            tt += (torch.exp(l2 - l1)** 2).sum().item()
+#            t += (l2 - l1).sum().item()
+##            tt += ((l2 - l1) ** 2).sum().item()
+#            tt += (torch.exp(l2 - l1) ** 2).sum().item()
 
             total_length += cur_length
 
-    mean = t / total_length
+    mean = (t / total_length)
     variance = tt / total_length - mean * mean
-    print ("mean, variance is", mean, variance)
+#    print ("mean, variance is", mean, variance)
 
     model.criterion.loss_type = args.loss
 
-    return math.exp(eval_loss/total_length)
+    return math.exp(eval_loss/total_length), mean, variance
 
 
 def run_epoch(epoch, lr, best_val_ppl):
     """A training epoch includes training, evaluation and logging"""
     epoch_start_time = time.time()
     train(model, corpus.train, epoch=epoch, lr=lr, weight_decay=args.weight_decay)
-    val_ppl = evaluate(model, corpus.valid)
+    epoch_ending_time = time.time()
     logger.warning(
-        '| end of epoch {:3d} | time: {:5.2f}s |'
-        'valid ppl {:8.2f}'.format(
+        '| end of epoch {:3d} | time: {:5.2f}s |'.format(
             epoch,
-            (time.time() - epoch_start_time),
-            val_ppl)
+            (epoch_ending_time - epoch_start_time))
+    )
+    val_ppl, mean, variance = evaluate(model, corpus.valid)
+    logger.warning(
+        'valid ppl {:8.2f}, mean {:8.4f}, variance {:8.4f}, stddev/mean {:8.4f}'.format(
+            val_ppl, mean, variance, math.sqrt(variance) / mean)
     )
     torch.save(model, model_path + '.epoch_{}'.format(epoch))
     # Save the model if the validation loss is the best we've seen so far.
@@ -227,6 +233,6 @@ if __name__ == '__main__':
         model = torch.load(model_path)
 
     # Run on test data.
-    test_ppl = evaluate(model, corpus.test)
-    logger.warning('| End of training | test ppl {:8.2f}'.format(test_ppl))
+    test_ppl, mean, variance = evaluate(model, corpus.test)
+    logger.warning('| End of training | test ppl {:8.2f} | mean {:8.2f} | variance {:8.4f}'.format(test_ppl, mean, variance))
     sys.stdout.flush()

@@ -19,6 +19,7 @@ class RNNModel(nn.Module):
         self.nlayers = nlayers
         self.criterion = criterion
 
+        self.criterion.emb.weight = self.encoder.weight
         self.reset_parameters()
 
     def reset_parameters(self):

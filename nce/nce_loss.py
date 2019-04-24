@@ -20,9 +20,8 @@ def povey_loss_fn(scores, output):
     nll_loss = nll_loss_fn(scores, output)
     exp_part = ce_loss - nll_loss
     exp_exp_part = torch.exp(exp_part)
+#    loss = ce_loss + (nll_loss + exp_exp_part - 1 - ce_loss) * 100
     loss = nll_loss + exp_exp_part - 1
-#    loss = torch.sum(nll_loss + exp_exp_part - 1)
-#    print (loss)
     return loss
 
 class NCELoss(nn.Module):
@@ -102,7 +101,7 @@ class NCELoss(nn.Module):
 
         batch = target.size(0)
         max_len = target.size(1)
-        if self.loss_type != 'full':
+        if self.loss_type != 'full' and self.loss_type != 'povey' and self.loss_type != 'regularized':
             noise_samples = self.get_noise(batch, max_len)
             # B,N,Nr
             prob_noise = Variable(
@@ -111,6 +110,9 @@ class NCELoss(nn.Module):
             prob_target_in_noise = Variable(
                 self.noise[target.data.view(-1)].view_as(target)
             )
+#            print (prob_noise)
+#            print (prob_target_in_noise)
+#            print ()
             # (B,N), (B,N,Nr)
             prob_model, prob_noise_in_model = self._get_prob(target, noise_samples, *args, **kwargs)
 
@@ -142,9 +144,6 @@ class NCELoss(nn.Module):
                     prob_model, prob_noise_in_model,
                     prob_noise, prob_target_in_noise,
                 )
-            elif self.loss_type == 'povey':
-                # Fallback into conventional cross entropy
-                loss = self.povey_loss(target, *args, **kwargs)
 
             else:
                 current_stage = 'training' if self.training else 'inference'
@@ -153,6 +152,12 @@ class NCELoss(nn.Module):
         elif self.loss_type == 'full':
             # Fallback into conventional cross entropy
             loss = self.ce_loss(target, *args, **kwargs)
+        elif self.loss_type == 'povey':
+            # Fallback into conventional cross entropy
+            loss = self.povey_loss(target, *args, **kwargs)
+        elif self.loss_type == 'regularized':
+            # Fallback into conventional cross entropy
+            loss = self.regularized_loss(target, *args, **kwargs)
 
         if self.reduction == 'elementwise_mean':
             return loss.mean()
@@ -211,10 +216,16 @@ class NCELoss(nn.Module):
             - Noise_idx: :math:`(N, N_r)` where `N_r = noise ratio`
         """
 
+#        print (*args)
+#        print (**kwargs)
         target_score, noise_score = self.get_score(target_idx, noise_idx, *args, **kwargs)
-
         target_prob = target_score.sub(self.norm_term).clamp_max(20).exp()
+#        print (target_score)
+#        print (target_prob.log())
         noise_prob = noise_score.sub(self.norm_term).clamp_max(20).exp()
+#        print (noise_score)
+#        print (noise_prob.log())
+#        print ()
         return target_prob, noise_prob
 
     def get_score(self, target_idx, noise_idx, *args, **kwargs):

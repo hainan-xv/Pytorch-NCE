@@ -17,6 +17,12 @@ class AliasMultinomial(torch.nn.Module):
         super(AliasMultinomial, self).__init__()
 
         probs = probs / probs.sum()
+
+        tmp = probs.numpy().tolist()
+#        for i in range(len(tmp)):
+#          print (i, tmp[i])
+
+
         cpu_probs = probs.cpu()
         K = len(probs)
 
@@ -56,12 +62,18 @@ class AliasMultinomial(torch.nn.Module):
         self.register_buffer('prob', torch.Tensor(self_prob))
         self.register_buffer('alias', torch.LongTensor(self_alias))
 
+#        print ( len(self.prob.numpy().tolist()))
+#        print ( self.prob.numpy().tolist())
+#        print (len(self.alias.numpy().tolist()))
+#        print (self.alias.numpy().tolist())
+
     def draw(self, *size):
         """Draw N samples from multinomial
 
         Args:
             - size: the output size of samples
         """
+
         max_value = self.alias.size(0)
 
         kk = self.alias.new(*size).random_(0, max_value).long().view(-1)

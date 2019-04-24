@@ -44,6 +44,13 @@ def write_freq(counter, freq_file):
         for word, freq in words_and_frequencies:
             f.writelines('{} {}\n'.format(word, freq))
 
+def write_map(idx2word, word_file):
+    # sort by frequency, then alphabetically
+    with open(word_file, 'w') as f:
+        for idx, word in enumerate(idx2word):
+            f.writelines('{} {}\n'.format(idx, word))
+
+
 
 class Vocab(object):
     """Defines a vocabulary object that will be used to numericalize a field.
@@ -189,6 +196,9 @@ def get_vocab(base_path, file_list, min_freq=1, force_recount=False, vocab_file=
         # saving for future uses
         freq_file = os.path.join(base_path, 'freq.txt')
         write_freq(vocab.freqs, freq_file)
+
+        map_file = os.path.join(base_path, 'words.txt')
+        write_map(vocab.idx2word, map_file)
         pickle.dump(vocab, open(cache_file, 'wb'))
 
     force_vocab = []
