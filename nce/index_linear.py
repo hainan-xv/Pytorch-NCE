@@ -39,8 +39,7 @@ class IndexLinear(NCELoss):
         self.emb.weight.data.uniform_(-stdv, stdv)
         if self.bias is not None:
             # initialize the bias with unigram instead of uniform
-            self.bias.weight.data = torch.log(self.noise + 1e-10) # + self.norm_term - 9.0
-#            self.bias.weight.data = torch.log(self.noise + 1e-10) + self.norm_term
+            self.bias.weight.data = torch.log(self.noise + 1e-10)
             self.bias.weight.data.unsqueeze_(1)
             self.bias.weight.requires_grad = False
 

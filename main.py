@@ -148,7 +148,7 @@ def train(model, data_source, epoch, lr=1.0, weight_decay=1e-5, momentum=0.9):
                     lr, cur_loss, ppl
                   )
             )
-            print('Progress %.4f, Training PPL %.4f' % (progress, ppl))
+            print('Progress %.4f, Training loss %.4f, PPL %.4f' % (progress, cur_loss, ppl))
 #            pbar.set_description('Training PPL %.1f' % ppl)
             total_loss = 0.0
             total_num_words = 0.0
@@ -173,15 +173,11 @@ def evaluate(model, data_source, cuda=args.cuda):
 
             t += torch.exp(l2 - l1).sum().item()
             tt += (torch.exp(l2 - l1)** 2).sum().item()
-#            t += (l2 - l1).sum().item()
-##            tt += ((l2 - l1) ** 2).sum().item()
-#            tt += (torch.exp(l2 - l1) ** 2).sum().item()
 
             total_length += cur_length
 
     mean = (t / total_length)
     variance = tt / total_length - mean * mean
-#    print ("mean, variance is", mean, variance)
 
     model.criterion.loss_type = args.loss
 
@@ -198,11 +194,22 @@ def run_epoch(epoch, lr, best_val_ppl):
             epoch,
             (epoch_ending_time - epoch_start_time))
     )
+
     val_ppl, mean, variance = evaluate(model, corpus.valid)
     logger.warning(
         'valid ppl {:8.2f}, mean {:8.4f}, variance {:8.4f}, stddev/mean {:8.4f}'.format(
-            val_ppl, mean, variance, math.sqrt(variance) / mean)
+            val_ppl, mean, variance, math.sqrt(variance) / (abs(mean) + 0.00000001))
     )
+
+
+#    model.criterion.bias.weight += math.log(mean)
+#    val_ppl, mean, variance = evaluate(model, corpus.valid)
+#    logger.warning(
+#        'again: valid ppl {:8.2f}, mean {:8.4f}, variance {:8.4f}, stddev/mean {:8.4f}'.format(
+#            val_ppl, mean, variance, math.sqrt(variance) / (mean + 0.00000001))
+#    )
+
+
     torch.save(model, model_path + '.epoch_{}'.format(epoch))
     # Save the model if the validation loss is the best we've seen so far.
     if not best_val_ppl or val_ppl < best_val_ppl:

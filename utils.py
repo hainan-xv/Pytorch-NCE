@@ -31,7 +31,7 @@ def setup_parser():
                         help='initial weight decay')
     parser.add_argument('--lr-decay', type=float, default=2,
                         help='learning rate decay when no progress is observed on validation set')
-    parser.add_argument('--clip', type=float, default=5,
+    parser.add_argument('--clip', type=float, default=0.5,
                         help='gradient clipping')
     parser.add_argument('--epochs', type=int, default=40,
                         help='upper epoch limit')
@@ -155,6 +155,11 @@ def build_unigram_noise(freq):
         elements indicate the probability distribution
     """
     total = freq.sum()
-    noise = freq / total
+    uni_freq = freq * 0 + 20
+   
+    total = uni_freq.sum()
+
+    noise = uni_freq / total
+    print (len(noise), noise)
     assert abs(noise.sum() - 1) < 0.001
     return noise
