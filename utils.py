@@ -155,11 +155,6 @@ def build_unigram_noise(freq):
         elements indicate the probability distribution
     """
     total = freq.sum()
-    uni_freq = freq * 0 + 20
-   
-    total = uni_freq.sum()
-
-    noise = uni_freq / total
-    print (len(noise), noise)
+    noise = freq / total
     assert abs(noise.sum() - 1) < 0.001
     return noise

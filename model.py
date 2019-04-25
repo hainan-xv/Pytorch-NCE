@@ -39,10 +39,11 @@ class RNNModel(nn.Module):
 
         mask = get_mask(length.data, max_len=input.size(1))
         rnn_output = self._rnn(input)
-        loss = self.criterion(target, rnn_output)
+        loss, real_loss = self.criterion(target, rnn_output)
         loss = torch.masked_select(loss, mask)
+        real_loss = torch.masked_select(real_loss, mask)
 
-        return loss.sum()
+        return (loss.sum(), real_loss.sum())
 
     def forward_normalized(self, input, target, length):
 

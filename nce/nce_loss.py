@@ -14,15 +14,13 @@ ce_loss_fn = nn.CrossEntropyLoss(reduction='none')
 nll_loss_fn = nn.NLLLoss(reduction='none')
 
 def povey_loss_fn(scores, output):
-#    print (scores.shape, output.shape)
-#    print (scores, output)
     ce_loss = ce_loss_fn(scores, output)
     nll_loss = nll_loss_fn(scores, output)
     exp_part = ce_loss - nll_loss
     exp_exp_part = torch.exp(exp_part)
-#    loss = ce_loss + (nll_loss + exp_exp_part - 1 - ce_loss) * 100
+#    loss = ce_loss + (nll_loss + exp_exp_part - 1 - ce_loss) * 10
     loss = nll_loss + exp_exp_part - 1
-    return loss
+    return loss, ce_loss
 
 class NCELoss(nn.Module):
     """Noise Contrastive Estimation
@@ -111,9 +109,6 @@ class NCELoss(nn.Module):
                 self.noise[target.data.view(-1)].view_as(target)
             ).log()
 
-#            print (score_noise.shape, score_target_in_noise.shape)
-#            print (score_noise, score_target_in_noise)
-
             # (B,N), (B,N,Nr)
             score_model, score_noise_in_model = self.get_score(target, noise_samples, *args, **kwargs)
 
@@ -132,9 +127,9 @@ class NCELoss(nn.Module):
                     prob_noise, prob_target_in_noise,
                 )
             elif self.loss_type == 'sampled_povey':
-                loss = self.sampled_povey_loss(
+                loss, real_loss = self.sampled_povey_loss(
                     score_model, score_noise_in_model,
-                    score_noise + math.log(args.noise_ratio), torch.zeros_like(score_target_in_noise),
+                    score_noise + math.log(self.noise_ratio), torch.zeros_like(score_target_in_noise),
                 )
             elif self.loss_type == 'mix' and self.training:
                 loss = 0.5 * self.nce_loss(
@@ -155,7 +150,7 @@ class NCELoss(nn.Module):
             loss = self.ce_loss(target, *args, **kwargs)
         elif self.loss_type == 'povey':
             # Fallback into conventional cross entropy
-            loss = self.povey_loss(target, *args, **kwargs)
+            loss, real_loss = self.povey_loss(target, *args, **kwargs)
         elif self.loss_type == 'regularized':
             # Fallback into conventional cross entropy
             loss = self.regularized_loss(target, *args, **kwargs)
@@ -165,7 +160,7 @@ class NCELoss(nn.Module):
         elif self.reduction == 'sum':
             return loss.sum()
         else:
-            return loss
+            return loss, real_loss
 
     def forward_normalized(self, target, *args, **kwargs):
         """compute the loss with output and the desired target
@@ -207,9 +202,6 @@ class NCELoss(nn.Module):
             noise_samples = self.alias.draw(1, 1, self.noise_ratio).expand(batch_size, max_len, self.noise_ratio)
 
         noise_samples = Variable(noise_samples).contiguous()
-#        t = noise_samples.cpu().numpy().tolist()[0][0]
-#        t.sort()
-#        print ("samples are", t)
         return noise_samples
 
     def _get_prob(self, target_idx, noise_idx, *args, **kwargs):
@@ -220,16 +212,9 @@ class NCELoss(nn.Module):
             - Noise_idx: :math:`(N, N_r)` where `N_r = noise ratio`
         """
 
-#        print (*args)
-#        print (**kwargs)
         target_score, noise_score = self.get_score(target_idx, noise_idx, *args, **kwargs)
         target_prob = target_score.sub(self.norm_term).clamp_max(20).exp()
-#        print (target_score)
-#        print (target_prob.log())
         noise_prob = noise_score.sub(self.norm_term).clamp_max(20).exp()
-#        print (noise_score)
-#        print (noise_prob.log())
-#        print ()
         return target_prob, noise_prob
 
     def get_score(self, target_idx, noise_idx, *args, **kwargs):
@@ -305,9 +290,11 @@ class NCELoss(nn.Module):
         q_logits = torch.cat([score_target_in_noise.unsqueeze(2) * 0.0, score_noise], dim=2)
         logits = logits - q_logits
         labels = torch.zeros_like(logits.narrow(2, 0, 1)).squeeze(2).long()
-        loss = self.povey(
+        loss, real_loss = self.povey(
             logits.view(-1, logits.size(-1)),
             labels.view(-1),
-        ).view_as(labels)
+        )
+        loss = loss.view_as(labels)
+        real_loss = real_loss.view_as(labels)
 
-        return loss
+        return loss, real_loss

@@ -118,29 +118,32 @@ def train(model, data_source, epoch, lr=1.0, weight_decay=1e-5, momentum=0.9):
     model.train()
     model.criterion.loss_type = args.loss
     total_loss = 0.0
-#    pbar = tqdm(data_source, desc='Training PPL: ....')
-    pbar = data_source
+    total_real_loss = 0.0
+    pbar = tqdm(data_source, desc='Training PPL: ....')
+#    pbar = data_source
     total_num_words = 0.0
     for num_batch, data_batch in enumerate(pbar):
         progress = num_batch / len(pbar) + epoch - 1
         optimizer.zero_grad()
         data, target, length = process_data(data_batch, cuda=args.cuda, sep_target=sep_target)
         total_num_words += length.sum().item()
-        loss = model(data, target, length) # / total_num_words
+        loss, real_loss = model(data, target, length) # / total_num_words
         loss.backward()
 
         # `clip_grad_norm` helps prevent the exploding gradient problem in RNNs / LSTMs.
         torch.nn.utils.clip_grad_norm_(model.parameters(), args.clip)
         optimizer.step()
         total_loss += loss.item()
+        total_real_loss += real_loss.item()
 
         if args.prof:
             break
         if num_batch % args.log_interval == 0 and num_batch > 0:
             cur_loss = total_loss / total_num_words
+            cur_real_loss = total_real_loss / total_num_words
             ppl = 100000
-            if cur_loss < math.log(ppl):
-              ppl = math.exp(cur_loss)
+            if True or cur_real_loss < math.log(ppl):
+              ppl = math.exp(cur_real_loss)
             logger.debug(
                 '| epoch {:3d} | {:5d}/{:5d} batches '
                 '| lr {:02.2f} | loss {:5.2f} | ppl {:8.2f}'.format(
@@ -148,9 +151,11 @@ def train(model, data_source, epoch, lr=1.0, weight_decay=1e-5, momentum=0.9):
                     lr, cur_loss, ppl
                   )
             )
-            print('Progress %.4f, Training loss %.4f, PPL %.4f' % (progress, cur_loss, ppl))
-#            pbar.set_description('Training PPL %.1f' % ppl)
+            info_str = ('Progress %.4f, Training loss %.4f, PPL %.4f' % (progress, cur_loss, ppl))
+#            print('Progress %.4f, Training loss %.4f, PPL %.4f' % (progress, cur_loss, ppl))
+            pbar.set_description(info_str)
             total_loss = 0.0
+            total_real_loss = 0.0
             total_num_words = 0.0
 
 def evaluate(model, data_source, cuda=args.cuda):
