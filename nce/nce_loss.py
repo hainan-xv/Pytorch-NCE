@@ -105,9 +105,13 @@ class NCELoss(nn.Module):
         if self.loss_type != 'full' and self.loss_type != 'povey' and self.loss_type != 'regularized':
             noise_samples = self.get_noise(batch, max_len, self.sample_with_replacement)
             # B,N,Nr
-            score_noise = Variable(
-                self.noise[noise_samples.data.view(-1)].view_as(noise_samples)
-            ).log()
+            if self.sample_with_replacement:
+              score_noise = Variable(
+                  self.noise[noise_samples.data.view(-1)].view_as(noise_samples)
+              ).log()
+            else:
+              score_noise = (self.povey_sampler.inclusion_probs / self.noise_ratio)[noise_samples.data.view(-1)].view_as(noise_samples).log()
+#            print (score_noise)
             score_target_in_noise = Variable(
                 self.noise[target.data.view(-1)].view_as(target)
             ).log()
@@ -298,7 +302,7 @@ class NCELoss(nn.Module):
     def sampled_povey_loss(self, score_model, score_noise_in_model, score_noise, score_target_in_noise):
         """Compute the sampled softmax loss based on the tensorflow's impl"""
         logits = torch.cat([score_model.unsqueeze(2), score_noise_in_model], dim=2)
-        q_logits = torch.cat([score_target_in_noise.unsqueeze(2) * 0.0, score_noise], dim=2)
+        q_logits = torch.cat([score_target_in_noise.unsqueeze(2), score_noise], dim=2)
         logits = logits - q_logits
         labels = torch.zeros_like(logits.narrow(2, 0, 1)).squeeze(2).long()
         loss, real_loss = self.povey(

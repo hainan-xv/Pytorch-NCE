@@ -120,8 +120,8 @@ def train(model, data_source, epoch, lr=1.0, weight_decay=1e-5, momentum=0.9):
     model.criterion.loss_type = args.loss
     total_loss = 0.0
     total_real_loss = 0.0
-    pbar = tqdm(data_source, desc='Training PPL: ....')
-#    pbar = data_source
+#    pbar = tqdm(data_source, desc='Training PPL: ....')
+    pbar = data_source
     total_num_words = 0.0
     for num_batch, data_batch in enumerate(pbar):
         progress = num_batch / len(pbar) + epoch - 1
@@ -153,8 +153,8 @@ def train(model, data_source, epoch, lr=1.0, weight_decay=1e-5, momentum=0.9):
                   )
             )
             info_str = ('Training loss %.4f, PPL %.4f' % (cur_loss, ppl))
-#            print('Progress %.4f, Training loss %.4f, PPL %.4f' % (progress, cur_loss, ppl))
-            pbar.set_description(info_str)
+            print('Progress %.4f, Training loss %.4f, PPL %.4f' % (progress, cur_loss, ppl))
+#            pbar.set_description(info_str)
             total_loss = 0.0
             total_real_loss = 0.0
             total_num_words = 0.0

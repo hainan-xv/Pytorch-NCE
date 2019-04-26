@@ -89,22 +89,23 @@ class PoveySampler(torch.nn.Module):
 
     self.sampling_probs = probs * num_samples
     self.num_samples = num_samples
-    self.t = self.probs * self.num_samples
+    self.inclusion_probs = self.probs * self.num_samples
 
     self.normalize()
     self.shuffle()
     self.counter = 0
 
   def normalize(self):
-    while self.t.max() > 1.0:
-      sum_before = self.t.sum()
-      self.t.clamp_(0.0, 1.0)
-      sum_after = self.t.sum()
-      self.t = torch.exp(torch.log(self.t) + math.log((sum_before - 0) / sum_after))
-    self.t = self.t.cpu()
+    while self.inclusion_probs.max() > 1.0:
+      sum_before = self.inclusion_probs.sum()
+      self.inclusion_probs.clamp_(0.0, 1.0)
+      sum_after = self.inclusion_probs.sum()
+      self.inclusion_probs = torch.exp(torch.log(self.inclusion_probs) + math.log(sum_before / sum_after)).cuda()
+    self.inclusion_probs_cpu = self.inclusion_probs.cpu()
+#    self.inclusion_probs_cpu.cpu()
 
   def shuffle(self):
-    cpu_t_list = self.t.numpy().tolist()
+    cpu_t_list = self.inclusion_probs_cpu.numpy().tolist()
     pairs = []
     for i, b in enumerate(cpu_t_list):
       pairs.append([i, b])
