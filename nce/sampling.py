@@ -96,13 +96,21 @@ class PoveySampler(torch.nn.Module):
     self.counter = 0
 
   def normalize(self):
+    if self.num_samples == len(self.probs):
+      self.inclusion_probs = self.inclusion_probs.cuda() * 0.0 + 1.0
+      self.inclusion_probs_cpu = self.inclusion_probs.cpu()
+      return
+
     while self.inclusion_probs.max() > 1.0:
       sum_before = self.inclusion_probs.sum()
       self.inclusion_probs.clamp_(0.0, 1.0)
       sum_after = self.inclusion_probs.sum()
       self.inclusion_probs = torch.exp(torch.log(self.inclusion_probs) + math.log(sum_before / sum_after)).cuda()
+      self.inclusion_probs *= self.num_samples / self.inclusion_probs.sum()
     self.inclusion_probs_cpu = self.inclusion_probs.cpu()
-#    self.inclusion_probs_cpu.cpu()
+    self.inclusion_probs_cpu *= self.num_samples / self.inclusion_probs_cpu.sum()
+#    print (self.inclusion_probs.sum())
+#    print (self.inclusion_probs_cpu.sum())
 
   def shuffle(self):
     cpu_t_list = self.inclusion_probs_cpu.numpy().tolist()
@@ -127,11 +135,25 @@ class PoveySampler(torch.nn.Module):
         self.bands.append(cur)
         cur_sum = cur_sum + prob - 1.0
         cur = [[idx, cur_sum]]
+
     self.bands.append(cur)
+
+    # solving floating point problems
+    if len(self.bands) > self.num_samples:
+      # there is one more column than expected, add the extra to the previous
+      for i in range(len(self.bands[-1])):
+        self.bands[-1][i][1] += 1.0
+      self.bands[-2] += self.bands[-1]
+      del self.bands[-1]
+
+    # renormalize last column
+    s = self.bands[-1][-1][1]
+    for i in range(len(self.bands[-1])):
+      self.bands[-1][i][1] /= s
 
   def draw(self, *size):
     self.counter += 1
-    if self.counter % 1000 == 0:
+    if self.counter % 150 == 0:
       self.shuffle()
     rand = random.uniform(0, 1)
     samples = []
@@ -152,6 +174,5 @@ class PoveySampler(torch.nn.Module):
           else:
             left = mid
         samples.append(pairs[right][0])
-#    samples.sort()
-    assert(len(samples) == self.num_samples)
+    samples.sort()
     return torch.LongTensor(samples).view(size).cuda()

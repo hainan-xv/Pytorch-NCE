@@ -5,7 +5,7 @@ import math
 import torch
 import torch.nn as nn
 from torch.autograd import Variable
-from .alias_multinomial import AliasMultinomial, PoveySampler
+from .sampling import AliasMultinomial, PoveySampler
 
 # A backoff probability to stabilize log operation
 BACKOFF_PROB = 1e-10
@@ -108,10 +108,10 @@ class NCELoss(nn.Module):
             if self.sample_with_replacement:
               score_noise = Variable(
                   self.noise[noise_samples.data.view(-1)].view_as(noise_samples)
-              ).log()
+              ).log() + math.log(self.noise_ratio)
             else:
-              score_noise = (self.povey_sampler.inclusion_probs / self.noise_ratio)[noise_samples.data.view(-1)].view_as(noise_samples).log()
-#            print (score_noise)
+              score_noise = Variable(self.povey_sampler.inclusion_probs[noise_samples.data.view(-1)].view_as(noise_samples)).log()
+
             score_target_in_noise = Variable(
                 self.noise[target.data.view(-1)].view_as(target)
             ).log()
@@ -136,7 +136,7 @@ class NCELoss(nn.Module):
             elif self.loss_type == 'sampled_povey':
                 loss, real_loss = self.sampled_povey_loss(
                     score_model, score_noise_in_model,
-                    score_noise + math.log(self.noise_ratio), torch.zeros_like(score_target_in_noise),
+                    score_noise, torch.zeros_like(score_target_in_noise),
                 )
             elif self.loss_type == 'mix' and self.training:
                 loss = 0.5 * self.nce_loss(
