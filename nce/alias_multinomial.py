@@ -1,4 +1,6 @@
+import math
 import torch
+import random
 
 class AliasMultinomial(torch.nn.Module):
     '''Alias sampling method to speedup multinomial sampling
@@ -16,7 +18,7 @@ class AliasMultinomial(torch.nn.Module):
     def __init__(self, probs):
         super(AliasMultinomial, self).__init__()
 
-        probs = probs / probs.sum()
+        self.probs = probs / probs.sum()
 
         cpu_probs = probs.cpu()
         K = len(probs)
@@ -76,4 +78,60 @@ class AliasMultinomial(torch.nn.Module):
 
         ret = (oq + oj).view(size)
         return ret
+
+
+class PoveySampler(torch.nn.Module):
+  def __init__(self, probs, num_samples):
+    super(PoveySampler, self).__init__()
+    self.probs = probs / probs.sum()
+    cpu_probs = probs.cpu()
+    K = len(probs)
+
+    self.sampling_probs = probs * num_samples
+    self.num_samples = num_samples
+    self.t = self.probs * self.num_samples
+
+    self.normalize()
+
+  def normalize(self):
+    while self.t.max() > 1.0:
+      sum_before = self.t.sum()
+      self.t.clamp_(0.0, 1.0)
+      sum_after = self.t.sum()
+      self.t = torch.exp(torch.log(self.t) + math.log((sum_before - 0) / sum_after))
+
+  def shuffle(self):
+    cpu_t_list = self.t.cpu().numpy().tolist()
+    pairs = []
+    for i, b in enumerate(cpu_t_list):
+      pairs.append([i, b])
+    random.shuffle(pairs)
+
+    t = [] # t is 3d and t[i][j] is a pair [idx, cumulative_prob_so_far]
+    cur = [] # cur is 2d and cur[i] is i'th [idx, cum] pair
+    cur_sum = 0.0
+    for idx, prob in pairs:
+      if cur_sum + prob <= 1.0:
+        cur_sum = cur_sum + prob
+        cur.append([idx, cur_sum])
+      elif cur_sum < 1.0:
+        cur.append([idx, 1.0])
+        t.append(cur)
+        cur_sum = cur_sum + prob - 1.0
+        cur = [[idx, cur_sum]]
+      else:
+        t.append(cur)
+        cur_sum = cur_sum + prob - 1.0
+        cur = [[idx, cur_sum]]
+    t.append(cur)
+
+  def draw(self, *size):
+    return
+
+
+
+
+
+
+
 

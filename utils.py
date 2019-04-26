@@ -145,7 +145,6 @@ def process_data(data_batch, cuda=False, sep_target=True):
 
     return data, target, effective_length
 
-
 def build_unigram_noise(freq):
     """build the unigram noise from a list of frequency
     Parameters:

@@ -151,7 +151,7 @@ def train(model, data_source, epoch, lr=1.0, weight_decay=1e-5, momentum=0.9):
                     lr, cur_loss, ppl
                   )
             )
-            info_str = ('Progress %.4f, Training loss %.4f, PPL %.4f' % (progress, cur_loss, ppl))
+            info_str = ('Training loss %.4f, PPL %.4f' % (cur_loss, ppl))
 #            print('Progress %.4f, Training loss %.4f, PPL %.4f' % (progress, cur_loss, ppl))
             pbar.set_description(info_str)
             total_loss = 0.0
@@ -195,10 +195,17 @@ def run_epoch(epoch, lr, best_val_ppl):
     train(model, corpus.train, epoch=epoch, lr=lr, weight_decay=args.weight_decay)
     epoch_ending_time = time.time()
     logger.warning(
-        '| end of epoch {:3d} | time: {:5.2f}s |'.format(
+        '| end of epoch {:3d} | time: {:5.2f}s |\n'.format(
             epoch,
             (epoch_ending_time - epoch_start_time))
     )
+
+    diagno_ppl, mean, variance = evaluate(model, corpus.diagno)
+    logger.warning(
+        'train diagnostic ppl {:8.2f}, mean {:8.4f}, variance {:8.4f}, stddev/mean {:8.4f}'.format(
+            diagno_ppl, mean, variance, math.sqrt(variance) / (abs(mean) + 0.00000001))
+    )
+    model.criterion.bias.weight += math.log(mean)
 
     val_ppl, mean, variance = evaluate(model, corpus.valid)
     logger.warning(

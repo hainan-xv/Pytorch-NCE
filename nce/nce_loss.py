@@ -5,7 +5,7 @@ import math
 import torch
 import torch.nn as nn
 from torch.autograd import Variable
-from .alias_multinomial import AliasMultinomial
+from .alias_multinomial import AliasMultinomial, PoveySampler
 
 # A backoff probability to stabilize log operation
 BACKOFF_PROB = 1e-10
@@ -18,7 +18,7 @@ def povey_loss_fn(scores, output):
     nll_loss = nll_loss_fn(scores, output)
     exp_part = ce_loss - nll_loss
     exp_exp_part = torch.exp(exp_part)
-#    loss = ce_loss + (nll_loss + exp_exp_part - 1 - ce_loss) * 10
+#    loss = ce_loss + (nll_loss + exp_exp_part - 1 - ce_loss) * 1
     loss = nll_loss + exp_exp_part - 1
     return loss, ce_loss
 
@@ -76,6 +76,9 @@ class NCELoss(nn.Module):
 
         self.register_buffer('noise', noise)
         self.alias = AliasMultinomial(noise)
+        self.povey_sampler = PoveySampler(noise, noise_ratio)
+        self.povey_sampler.shuffle()
+
         self.noise_ratio = noise_ratio
         if norm_term == 'auto':
             self.norm_term = math.log(noise.numel())

@@ -107,6 +107,7 @@ class Corpus(object):
             self.vocab.idx2count[2] = 0.000001  # </s>
 
         self.train = self.get_dataloader('train.txt', self.batch_size)
+        self.diagno = self.get_dataloader('train.diagnostic.txt', 1)
         self.valid = self.get_dataloader('valid.txt', 1)
         self.test = self.get_dataloader('test.txt', 1)
 
