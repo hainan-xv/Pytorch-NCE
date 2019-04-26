@@ -92,6 +92,8 @@ class PoveySampler(torch.nn.Module):
     self.t = self.probs * self.num_samples
 
     self.normalize()
+    self.shuffle()
+    self.counter = 0
 
   def normalize(self):
     while self.t.max() > 1.0:
@@ -99,15 +101,16 @@ class PoveySampler(torch.nn.Module):
       self.t.clamp_(0.0, 1.0)
       sum_after = self.t.sum()
       self.t = torch.exp(torch.log(self.t) + math.log((sum_before - 0) / sum_after))
+    self.t = self.t.cpu()
 
   def shuffle(self):
-    cpu_t_list = self.t.cpu().numpy().tolist()
+    cpu_t_list = self.t.numpy().tolist()
     pairs = []
     for i, b in enumerate(cpu_t_list):
       pairs.append([i, b])
     random.shuffle(pairs)
 
-    t = [] # t is 3d and t[i][j] is a pair [idx, cumulative_prob_so_far]
+    self.bands = [] # t is 3d and t[i][j] is a pair [idx, cumulative_prob_so_far]
     cur = [] # cur is 2d and cur[i] is i'th [idx, cum] pair
     cur_sum = 0.0
     for idx, prob in pairs:
@@ -116,22 +119,38 @@ class PoveySampler(torch.nn.Module):
         cur.append([idx, cur_sum])
       elif cur_sum < 1.0:
         cur.append([idx, 1.0])
-        t.append(cur)
+        self.bands.append(cur)
         cur_sum = cur_sum + prob - 1.0
         cur = [[idx, cur_sum]]
       else:
-        t.append(cur)
+        self.bands.append(cur)
         cur_sum = cur_sum + prob - 1.0
         cur = [[idx, cur_sum]]
-    t.append(cur)
+    self.bands.append(cur)
 
   def draw(self, *size):
-    return
-
-
-
-
-
-
-
-
+    self.counter += 1
+    if self.counter % 1000 == 0:
+      self.shuffle()
+    rand = random.uniform(0, 1)
+    samples = []
+    for pairs in self.bands:
+      # i is 2d, a list of [idx, cumu] pairs
+      if rand <= pairs[0][1]:
+        samples.append(pairs[0][0])
+      else:
+        left = 1
+        right = len(pairs) - 1
+        while left + 1 < right:
+          mid = int((left + right) / 2)
+          if pairs[mid][1] > rand:
+            right = mid
+          elif pairs[mid][1] == rand:
+            samples.append(pairs[mid][0])
+            break
+          else:
+            left = mid
+        samples.append(pairs[right][0])
+#    samples.sort()
+    assert(len(samples) == self.num_samples)
+    return torch.LongTensor(samples).view(size).cuda()

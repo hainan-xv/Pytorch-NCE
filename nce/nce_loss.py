@@ -71,14 +71,13 @@ class NCELoss(nn.Module):
                  reduction='elementwise_mean',
                  per_word=False,
                  loss_type='nce',
+                 sample_with_replacement=False
                  ):
         super(NCELoss, self).__init__()
 
         self.register_buffer('noise', noise)
         self.alias = AliasMultinomial(noise)
         self.povey_sampler = PoveySampler(noise, noise_ratio)
-        self.povey_sampler.shuffle()
-
         self.noise_ratio = noise_ratio
         if norm_term == 'auto':
             self.norm_term = math.log(noise.numel())
@@ -91,6 +90,7 @@ class NCELoss(nn.Module):
         self.nll = nn.NLLLoss(reduction='none')
         self.povey = povey_loss_fn
         self.loss_type = loss_type
+        self.sample_with_replacement = sample_with_replacement
 
     def forward(self, target, *args, **kwargs):
         """compute the loss with output and the desired target
@@ -103,7 +103,7 @@ class NCELoss(nn.Module):
         batch = target.size(0)
         max_len = target.size(1)
         if self.loss_type != 'full' and self.loss_type != 'povey' and self.loss_type != 'regularized':
-            noise_samples = self.get_noise(batch, max_len)
+            noise_samples = self.get_noise(batch, max_len, self.sample_with_replacement)
             # B,N,Nr
             score_noise = Variable(
                 self.noise[noise_samples.data.view(-1)].view_as(noise_samples)
@@ -192,17 +192,27 @@ class NCELoss(nn.Module):
         loss = self.nll_loss(target, *args, **kwargs)
         return loss
 
-    def get_noise(self, batch_size, max_len):
+    def get_noise(self, batch_size, max_len, with_replacement):
         """Generate noise samples from noise distribution"""
 
         if self.per_word:
+          if with_replacement:
             noise_samples = self.alias.draw(
                 batch_size,
                 max_len,
                 self.noise_ratio,
             )
+          else:
+            noise_samples = self.povey_sampler.draw(
+                batch_size,
+                max_len,
+                self.noise_ratio,
+            )
         else:
+          if with_replacement:
             noise_samples = self.alias.draw(1, 1, self.noise_ratio).expand(batch_size, max_len, self.noise_ratio)
+          else:
+            noise_samples = self.povey_sampler.draw(1, 1, self.noise_ratio).expand(batch_size, max_len, self.noise_ratio)
 
         noise_samples = Variable(noise_samples).contiguous()
         return noise_samples
@@ -276,8 +286,6 @@ class NCELoss(nn.Module):
         """Compute the sampled softmax loss based on the tensorflow's impl"""
         logits = torch.cat([prob_model.unsqueeze(2), prob_noise_in_model], dim=2).clamp_min(BACKOFF_PROB).log()
         q_logits = torch.cat([torch.zeros_like(prob_target_in_noise.unsqueeze(2)), prob_noise], dim=2).clamp_min(BACKOFF_PROB).log()
-#        q_logits = torch.cat([prob_target_in_noise.unsqueeze(2), prob_noise], dim=2).clamp_min(BACKOFF_PROB).log()
-        # subtract Q for correction of biased sampling
         logits = logits - q_logits
         labels = torch.zeros_like(logits.narrow(2, 0, 1)).squeeze(2).long()
         loss = self.ce(

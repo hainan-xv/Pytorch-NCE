@@ -74,6 +74,7 @@ def build_model():
             norm_term=norm_term,
             loss_type=args.loss,
             reduction='none',
+            sample_with_replacement=args.sample_with_replacement
         )
         model = RNNModel(
             ntoken, args.emsize, args.nhid, args.nlayers,

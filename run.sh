@@ -6,6 +6,7 @@ dropout=0.0
 noise_ratio=512
 lr=0.001
 concat=true
+sample_with_replacement=true
 emsize=200
 epochs=40
 nlayers=2
@@ -19,10 +20,16 @@ else
   concat=""
 fi
 
+if $sample_with_replacement; then
+  sample_with_replacement="--sample-with-replacement"
+else
+  sample_with_replacement=""
+fi
+
 export CUDA_VISIBLE_DEVICES=`free-gpu`
 
 dir=${loss}_${batch_size}_${dropout}_${noise_ratio}_${lr}_${nlayers}
 mkdir -p saved_model/$dir
 mkdir -p log/$dir
 
-python3 -u main.py $concat --log-interval $log_interval --nlayers $nlayers --epochs $epochs --emsize $emsize --lr $lr --batch-size $batch_size --cuda --loss $loss --train --noise-ratio $noise_ratio --save $dir/model 2>&1 | tee log.train
+python3 -u main.py $concat $sample_with_replacement --log-interval $log_interval --nlayers $nlayers --epochs $epochs --emsize $emsize --lr $lr --batch-size $batch_size --cuda --loss $loss --train --noise-ratio $noise_ratio --save $dir/model 2>&1 | tee log.train
