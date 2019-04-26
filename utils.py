@@ -29,6 +29,8 @@ def setup_parser():
                         help='Use concatenated sentences chunked into length of bptt')
     parser.add_argument('--sample-with-replacement', action='store_true',
                         help='if not, sample unique words')
+    parser.add_argument('--sample-with-grouping', action='store_true',
+                        help='using grouping techniques for systematic sampling')
     parser.add_argument('--weight-decay', type=float, default=0.0,
                         help='initial weight decay')
     parser.add_argument('--lr-decay', type=float, default=2,

@@ -5,7 +5,7 @@ import math
 import torch
 import torch.nn as nn
 from torch.autograd import Variable
-from .sampling import AliasMultinomial, PoveySampler
+from .sampling import AliasMultinomial, BandedSampler, BandedGroupSampler
 
 # A backoff probability to stabilize log operation
 BACKOFF_PROB = 1e-10
@@ -71,13 +71,15 @@ class NCELoss(nn.Module):
                  reduction='elementwise_mean',
                  per_word=False,
                  loss_type='nce',
-                 sample_with_replacement=False
+                 sample_with_replacement=False,
+                 grouping=True
                  ):
         super(NCELoss, self).__init__()
 
         self.register_buffer('noise', noise)
         self.alias = AliasMultinomial(noise)
-        self.povey_sampler = PoveySampler(noise, noise_ratio)
+        self.banded_sampler = BandedSampler(noise, noise_ratio)
+        self.group_sampler = BandedGroupSampler(noise, noise_ratio)
         self.noise_ratio = noise_ratio
         if norm_term == 'auto':
             self.norm_term = math.log(noise.numel())
@@ -91,6 +93,7 @@ class NCELoss(nn.Module):
         self.povey = povey_loss_fn
         self.loss_type = loss_type
         self.sample_with_replacement = sample_with_replacement
+        self.grouping = grouping
 
     def forward(self, target, *args, **kwargs):
         """compute the loss with output and the desired target
@@ -110,7 +113,7 @@ class NCELoss(nn.Module):
                   self.noise[noise_samples.data.view(-1)].view_as(noise_samples)
               ).log() + math.log(self.noise_ratio)
             else:
-              score_noise = Variable(self.povey_sampler.inclusion_probs[noise_samples.data.view(-1)].view_as(noise_samples)).log()
+              score_noise = Variable(self.banded_sampler.inclusion_probs[noise_samples.data.view(-1)].view_as(noise_samples)).log()
 
             score_target_in_noise = Variable(
                 self.noise[target.data.view(-1)].view_as(target)
@@ -207,16 +210,26 @@ class NCELoss(nn.Module):
                 self.noise_ratio,
             )
           else:
-            noise_samples = self.povey_sampler.draw(
-                batch_size,
-                max_len,
-                self.noise_ratio,
-            )
+            if self.grouping:
+              noise_samples = self.group_sampler.draw(
+                  batch_size,
+                  max_len,
+                  self.noise_ratio,
+              )
+            else:
+              noise_samples = self.banded_sampler.draw(
+                  batch_size,
+                  max_len,
+                  self.noise_ratio,
+              )
         else:
           if with_replacement:
             noise_samples = self.alias.draw(1, 1, self.noise_ratio).expand(batch_size, max_len, self.noise_ratio)
           else:
-            noise_samples = self.povey_sampler.draw(1, 1, self.noise_ratio).expand(batch_size, max_len, self.noise_ratio)
+            if self.grouping:
+              noise_samples = self.group_sampler.draw(1, 1, self.noise_ratio).expand(batch_size, max_len, self.noise_ratio)
+            else:
+              noise_samples = self.banded_sampler.draw(1, 1, self.noise_ratio).expand(batch_size, max_len, self.noise_ratio)
 
         noise_samples = Variable(noise_samples).contiguous()
         return noise_samples
