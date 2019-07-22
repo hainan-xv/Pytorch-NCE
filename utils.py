@@ -59,7 +59,7 @@ def setup_parser():
     parser.add_argument('--noise-ratio', type=int, default=50,
                         help='set the noise ratio of NCE sampling, the noise'
                         ' is shared among batch')
-    parser.add_argument('--norm-term', type=int, default=0,
+    parser.add_argument('--norm-term', type=float, default=1.0,
                         help='set the log normalization term of NCE sampling')
     parser.add_argument('--train', action='store_true',
                         help='set train mode, otherwise only evaluation is'
@@ -70,6 +70,8 @@ def setup_parser():
     parser.add_argument('--prof', action='store_true',
                         help='Enable profiling mode, will execute only one '
                         'batch data')
+    parser.add_argument('--trick', type=int, default=0, help='Use the trick of freezing bias as unigram probs to speed up training')
+    parser.add_argument('--normalize', type=int, default=0, help='shift the bias by log of average normalization term of dev data to make it normalized')
     return parser
 
 

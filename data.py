@@ -8,7 +8,7 @@ from torch.utils.data.dataloader import DataLoader
 from torch.nn.utils.rnn import pad_sequence
 from tqdm import tqdm
 
-from vocab import get_vocab, BOS, EOS
+from vocab import get_vocab, BOS, EOS, retrieve_vocab
 
 
 class LMDataset(Dataset):
@@ -117,6 +117,36 @@ class Corpus(object):
             dataset = ContLMDataset(full_path, vocab=self.vocab, bptt=self.bptt)
         else:
             dataset = LMDataset(full_path, vocab=self.vocab, bptt=self.bptt)
+        return DataLoader(
+            dataset=dataset,
+            batch_size=bs,
+            shuffle=self.shuffle,
+            pin_memory=self.pin_memory,
+            collate_fn=pad_collate_fn,
+            # num_workers=1,
+            # waiting for a new torch version to support
+            # drop_last=True,
+        )
+
+class TestCorpus(object):
+    def __init__(self, test_path, vocab_path=None, batch_size=1,
+                 pin_memory=False, update_vocab=False,
+                 concat=False):
+        self.batch_size = batch_size
+        self.shuffle = False
+        self.pin_memory = pin_memory
+        self.update_vocab = update_vocab
+        self.concat = concat
+
+        self.vocab = retrieve_vocab(vocab_path)
+        self.test = self.get_dataloader(test_path, 1)
+
+    def get_dataloader(self, filename, bs=1):
+        full_path = filename
+        if self.concat:
+            dataset = ContLMDataset(full_path, vocab=self.vocab, bptt=self.bptt)
+        else:
+            dataset = LMDataset(full_path, vocab=self.vocab, bptt=999)
         return DataLoader(
             dataset=dataset,
             batch_size=bs,

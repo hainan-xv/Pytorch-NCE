@@ -208,3 +208,25 @@ def get_vocab(base_path, file_list, min_freq=1, force_recount=False, vocab_file=
     vocab.build(force_vocab=force_vocab)
     check_vocab(vocab)
     return vocab
+
+def retrieve_vocab(vocab_file):
+    """Build vocabulary file with each line the word and frequency
+
+    The vocabulary object is cached at the first build, aiming at reducing
+    the time cost for pre-process during training large dataset
+
+    Args:
+        - sentences: sentences with BOS and EOS
+        - min_freq: minimal frequency to truncate
+        - force_recount: force a re-count of word frequency regardless of the
+        Count cache file
+        - vocab_file: a specific vocabulary file. If not None, the returned
+        vocabulary will only count the words in vocab_file, with others treated
+        as <unk>
+
+    Return:
+        - vocab: the Vocab object
+    """
+    vocab = pickle.load(open(vocab_file, 'rb'))
+    logger.debug('Load cached vocabulary object finished')
+    return vocab

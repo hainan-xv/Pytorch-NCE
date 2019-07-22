@@ -70,6 +70,7 @@ def build_model():
         criterion = IndexLinear(
             args.nhid,
             ntoken,
+            args.trick,
             noise=noise,
             noise_ratio=args.noise_ratio,
             norm_term=norm_term,
@@ -208,7 +209,8 @@ def run_epoch(epoch, lr, best_val_ppl):
         'train diagnostic ppl {:8.2f}, mean {:8.4f}, variance {:8.4f}, stddev/mean {:8.4f}'.format(
             diagno_ppl, mean, variance, math.sqrt(variance) / (abs(mean) + 0.00000001))
     )
-    model.criterion.bias.weight += math.log(mean)
+    if args.normalize != 0:
+      model.criterion.bias.weight += math.log(mean) - math.log(args.norm_term)
 
     val_ppl, mean, variance = evaluate(model, corpus.valid)
     logger.warning(

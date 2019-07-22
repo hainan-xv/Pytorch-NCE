@@ -25,11 +25,12 @@ class IndexLinear(NCELoss):
         - noise_score :math:`(N, N_r)` the un-normalized score
     """
 
-    def __init__(self, embedding_dim, num_classes, *args, **kwargs):
+    def __init__(self, embedding_dim, num_classes, trick, *args, **kwargs):
         super(IndexLinear, self).__init__(*args, **kwargs)
         # use Embedding to store the output embedding
         # it's efficient when it comes sparse update of gradients
         self.emb = nn.Embedding(num_classes, embedding_dim)
+        self.trick = trick
         # self.bias = nn.Parameter(torch.Tensor(num_classes))
         self.bias = nn.Embedding(num_classes, 1)
         self.reset_parameters()
@@ -40,8 +41,10 @@ class IndexLinear(NCELoss):
         if self.bias is not None:
             # initialize the bias with unigram instead of uniform
             self.bias.weight.data = torch.log(self.noise + 1e-10)
-            self.bias.weight.data.unsqueeze_(1)
-            self.bias.weight.requires_grad = False
+#            self.bias.weight.data.unsqueeze_(1)
+            if self.trick != 0:
+              self.bias.weight.requires_grad = False
+            self.bias.weight.data = self.bias.weight.data.unsqueeze(1)
 
     def get_score(self, target_idx, noise_idx, input):
         """
@@ -166,9 +169,19 @@ class IndexLinear(NCELoss):
         score = F.linear(input, self.emb.weight, self.bias.weight.squeeze(1))  # (N, V)
         loss, real_loss = self.povey(
             score.view(-1, score.size(-1)),
-            target_idx.view(-1)
+            target_idx.view(-1),
+            theta=self.norm_term
         )
         return loss.view_as(target_idx), real_loss.view_as(target_idx)
+
+    def fast_loss(self, target_idx, input):
+        score = F.linear(input, self.emb.weight, self.bias.weight.squeeze(1))  # (N, V)
+        loss, real_loss = self.fast(
+            score.view(-1, score.size(-1)),
+            target_idx.view(-1),
+            theta=self.norm_term
+        )
+        return loss.view_as(target_idx)
 
 
     def nll_loss(self, target_idx, input):

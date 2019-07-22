@@ -13,6 +13,7 @@ BACKOFF_PROB = 1e-10
 ce_loss_fn = nn.CrossEntropyLoss(reduction='none')
 nll_loss_fn = nn.NLLLoss(reduction='none')
 
+# default version, approximate log(x) as x - 1
 def povey_loss_fn(scores, output):
     ce_loss = ce_loss_fn(scores, output)
     nll_loss = nll_loss_fn(scores, output)
@@ -21,6 +22,23 @@ def povey_loss_fn(scores, output):
 #    loss = ce_loss + (nll_loss + exp_exp_part - 1 - ce_loss) * 1
     loss = nll_loss + exp_exp_part - 1
     return loss, ce_loss
+# approximate log(x) with other tangent lines
+def povey_loss_fn_2(scores, output, theta=1.0):
+    ce_loss = ce_loss_fn(scores, output)
+    nll_loss = nll_loss_fn(scores, output)
+    exp_part = ce_loss - nll_loss
+    exp_exp_part = torch.exp(exp_part)
+#    loss = ce_loss + (nll_loss + exp_exp_part - 1 - ce_loss) * 1
+    loss = nll_loss + exp_exp_part * theta - math.log(theta) - 1
+    return loss, ce_loss
+
+def fast_loss(scores, output):
+    nll_loss = nll_loss_fn(scores, output)
+    return nll_loss
+
+def slow_loss(scores, output):
+    ce_loss = ce_loss_fn(scores, output)
+    return ce_loss
 
 class NCELoss(nn.Module):
     """Noise Contrastive Estimation
@@ -67,7 +85,7 @@ class NCELoss(nn.Module):
     def __init__(self,
                  noise,
                  noise_ratio=100,
-                 norm_term='auto',
+                 norm_term=1.0,
                  reduction='elementwise_mean',
                  per_word=False,
                  loss_type='nce',
@@ -90,7 +108,9 @@ class NCELoss(nn.Module):
         self.bce = nn.BCELoss(reduction='none')
         self.ce = nn.CrossEntropyLoss(reduction='none')
         self.nll = nn.NLLLoss(reduction='none')
-        self.povey = povey_loss_fn
+        self.povey = povey_loss_fn_2
+        self.fast = fast_loss
+        self.slow = slow_loss
         self.loss_type = loss_type
         self.sample_with_replacement = sample_with_replacement
         self.grouping = grouping
@@ -158,6 +178,7 @@ class NCELoss(nn.Module):
         elif self.loss_type == 'full':
             # Fallback into conventional cross entropy
             loss = self.ce_loss(target, *args, **kwargs)
+            real_loss = loss
         elif self.loss_type == 'povey':
             # Fallback into conventional cross entropy
             loss, real_loss = self.povey_loss(target, *args, **kwargs)
@@ -186,7 +207,7 @@ class NCELoss(nn.Module):
         nll_loss = self.nll_loss(target, *args, **kwargs)
         return ce_loss, nll_loss
 
-    def fast_normalized(self, target, *args, **kwargs):
+    def forward_fast(self, target, *args, **kwargs):
         """compute the loss with output and the desired target
 
         The `forward` is the same among all NCELoss submodules, it
@@ -197,6 +218,19 @@ class NCELoss(nn.Module):
         batch = target.size(0)
         max_len = target.size(1)
         loss = self.nll_loss(target, *args, **kwargs)
+        return loss
+
+    def forward_slow(self, target, *args, **kwargs):
+        """compute the loss with output and the desired target
+
+        The `forward` is the same among all NCELoss submodules, it
+        takes care of generating noises and calculating the loss
+        given target and noise scores.
+        """
+
+        batch = target.size(0)
+        max_len = target.size(1)
+        loss = self.ce_loss(target, *args, **kwargs)
         return loss
 
     def get_noise(self, batch_size, max_len, with_replacement):
@@ -321,6 +355,8 @@ class NCELoss(nn.Module):
         loss, real_loss = self.povey(
             logits.view(-1, logits.size(-1)),
             labels.view(-1),
+            self.norm_term
+
         )
         loss = loss.view_as(labels)
         real_loss = real_loss.view_as(labels)
