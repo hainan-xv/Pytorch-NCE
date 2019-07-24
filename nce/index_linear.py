@@ -175,13 +175,11 @@ class IndexLinear(NCELoss):
         return loss.view_as(target_idx), real_loss.view_as(target_idx)
 
     def fast_loss(self, target_idx, input):
-        score = F.linear(input, self.emb.weight, self.bias.weight.squeeze(1))  # (N, V)
-        loss, real_loss = self.fast(
-            score.view(-1, score.size(-1)),
-            target_idx.view(-1),
-            theta=self.norm_term
-        )
-        return loss.view_as(target_idx)
+
+        emb = self.emb.weight[target_idx]
+        bias = self.bias.weight[target_idx]
+        d = torch.sum(torch.mul(emb, input)) + torch.sum(bias)
+        return -d
 
 
     def nll_loss(self, target_idx, input):

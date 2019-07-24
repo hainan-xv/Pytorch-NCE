@@ -34,7 +34,6 @@ class RNNModel(nn.Module):
         output = self.drop(output)
         return output
 
-
     def forward(self, input, target, length):
 
         mask = get_mask(length.data, max_len=input.size(1))
@@ -59,7 +58,6 @@ class RNNModel(nn.Module):
         mask = get_mask(length.data, max_len=input.size(1))
         rnn_output = self._rnn(input)
         l1 = self.criterion.forward_fast(target, rnn_output)
-        l1 = torch.masked_select(l1, mask)
         return l1
 
     def forward_slow(self, input, target, length):

@@ -32,7 +32,7 @@ def povey_loss_fn_2(scores, output, theta=1.0):
     loss = nll_loss + exp_exp_part * theta - math.log(theta) - 1
     return loss, ce_loss
 
-def fast_loss(scores, output):
+def fast_loss(scores, output, theta=1.0):
     nll_loss = nll_loss_fn(scores, output)
     return nll_loss
 
@@ -217,7 +217,8 @@ class NCELoss(nn.Module):
 
         batch = target.size(0)
         max_len = target.size(1)
-        loss = self.nll_loss(target, *args, **kwargs)
+#        loss = self.nll_loss(target, *args, **kwargs)
+        loss = self.fast_loss(target, *args, **kwargs)
         return loss
 
     def forward_slow(self, target, *args, **kwargs):
