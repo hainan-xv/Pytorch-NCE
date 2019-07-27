@@ -19,7 +19,7 @@ def povey_loss_fn(scores, output):
     nll_loss = nll_loss_fn(scores, output)
     exp_part = ce_loss - nll_loss
     exp_exp_part = torch.exp(exp_part)
-#    loss = ce_loss + (nll_loss + exp_exp_part - 1 - ce_loss) * 1
+#    loss = ce_loss + (nll_loss + exp_exp_part - 1 - ce_loss) * 10
     loss = nll_loss + exp_exp_part - 1
     return loss, ce_loss
 # approximate log(x) with other tangent lines
@@ -28,7 +28,7 @@ def povey_loss_fn_2(scores, output, theta=1.0):
     nll_loss = nll_loss_fn(scores, output)
     exp_part = ce_loss - nll_loss
     exp_exp_part = torch.exp(exp_part)
-#    loss = ce_loss + (nll_loss + exp_exp_part - 1 - ce_loss) * 1
+#    loss = ce_loss + (nll_loss + exp_exp_part - 1 - ce_loss) * 10
     loss = nll_loss + exp_exp_part * theta - math.log(theta) - 1
     return loss, ce_loss
 

@@ -3,7 +3,7 @@
 loss=full
 data=data/ami
 batch_size=64
-dropout=0.3
+dropout=0.4
 noise_ratio=512
 lr=0.001
 concat=true
@@ -39,15 +39,16 @@ fi
 
 export CUDA_VISIBLE_DEVICES=`free-gpu`
 
-dir=${loss}_${batch_size}_${dropout}_${noise_ratio}_${lr}_${nlayers}_${norm_term}_${normalize}_${trick}
+dir=ami_${loss}_${batch_size}_${dropout}_${noise_ratio}_${lr}_${nlayers}_${norm_term}_${normalize}_${trick}
 mkdir -p saved_model/$dir
 mkdir -p log/$dir
 
-cp $data/vocab.pkl saved_model/$dir
-
 python3 -u main.py $concat $sample_with_replacement $sample_with_grouping --data $data --norm-term $norm_term --log-interval $log_interval --nlayers $nlayers --epochs $epochs --emsize $emsize --lr $lr --batch-size $batch_size --cuda --loss $loss --train --noise-ratio $noise_ratio --save $dir/model 2>&1 | tee saved_model/$dir/log.train
-
 best_epoch=`grep "valid ppl" saved_model/$dir/log.train | awk '{print NR, $3}' | sed "s=,==g" | sort -k2n | head -n1 | awk '{print $1}'`
+best_loss=`grep "valid ppl" saved_model/$dir/log.train | awk '{print NR, $3}' | sed "s=,==g" | sort -k2n | head -n1 | awk '{print $2}'`
 
-[ -f $PWD/saved_model/$dir/best.mdl ] && rm $PWD/saved_model/$dir/best.mdl
+mv $data/vocab.pkl saved_model/$dir
+echo $best_loss > saved_model/$dir/best_loss
+
+rm -f $PWD/saved_model/$dir/best.mdl
 ln -s $PWD/saved_model/$dir/model.epoch_$best_epoch $PWD/saved_model/$dir/best.mdl

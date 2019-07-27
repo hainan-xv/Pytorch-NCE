@@ -142,7 +142,7 @@ class BandedSampler(torch.nn.Module):
 
   def normalize(self):
     if self.num_samples == len(self.probs):
-      self.inclusion_probs = self.inclusion_probs.cuda() * 0.0 + 1.0
+      self.inclusion_probs = self.inclusion_probs * 0.0 + 1.0
       self.inclusion_probs_cpu = self.inclusion_probs.cpu()
       return
 
@@ -150,7 +150,7 @@ class BandedSampler(torch.nn.Module):
       sum_before = self.inclusion_probs.sum()
       self.inclusion_probs.clamp_(0.0, 1.0)
       sum_after = self.inclusion_probs.sum()
-      self.inclusion_probs = torch.exp(torch.log(self.inclusion_probs) + math.log(sum_before / sum_after)).cuda()
+      self.inclusion_probs = torch.exp(torch.log(self.inclusion_probs) + math.log(sum_before / sum_after))
       self.inclusion_probs *= self.num_samples / self.inclusion_probs.sum()
     self.inclusion_probs_cpu = self.inclusion_probs.cpu()
     self.inclusion_probs_cpu *= self.num_samples / self.inclusion_probs_cpu.sum()
@@ -207,7 +207,7 @@ class BandedSampler(torch.nn.Module):
       idx = binary_search(pairs, 0, len(pairs), rand)
       samples.append(pairs[idx][0])
     samples.sort()
-    return torch.LongTensor(samples).view(size).cuda()
+    return torch.LongTensor(samples).view(size)
 
 class BandedGroupSampler(torch.nn.Module):
   def __init__(self, probs, num_samples):
@@ -227,7 +227,7 @@ class BandedGroupSampler(torch.nn.Module):
 
   def normalize(self):
     if self.num_samples == len(self.probs):
-      self.inclusion_probs = self.inclusion_probs.cuda() * 0.0 + 1.0
+      self.inclusion_probs = self.inclusion_probs * 0.0 + 1.0
       self.inclusion_probs_cpu = self.inclusion_probs.cpu()
       return
 
@@ -235,7 +235,7 @@ class BandedGroupSampler(torch.nn.Module):
       sum_before = self.inclusion_probs.sum()
       self.inclusion_probs.clamp_(0.0, 1.0)
       sum_after = self.inclusion_probs.sum()
-      self.inclusion_probs = torch.exp(torch.log(self.inclusion_probs) + math.log(sum_before / sum_after)).cuda()
+      self.inclusion_probs = torch.exp(torch.log(self.inclusion_probs) + math.log(sum_before / sum_after))
       self.inclusion_probs *= self.num_samples / self.inclusion_probs.sum()
     self.inclusion_probs_cpu = self.inclusion_probs.cpu()
 #    self.inclusion_probs_cpu *= self.num_samples / self.inclusion_probs_cpu.sum()
@@ -325,7 +325,7 @@ class BandedGroupSampler(torch.nn.Module):
       idx = self.get_random_one(group_idx)
       samples.append(self.groups[group_idx][0] + idx)
     samples.sort()
-    return torch.LongTensor(samples).view(size).cuda()
+    return torch.LongTensor(samples).view(size)
 
   def get_random_one(self, group_idx):
     rand = random.uniform(0, self.groups[group_idx][2])
