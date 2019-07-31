@@ -51,13 +51,22 @@ logger.info('Vocabulary size is {}'.format(ntoken))
 ################################################################## Build the criterion and model, setup the NCE module
 #################################################################
 
-def build_model():
+def build_model(resume):
     """Build the model according to CLI arguments
 
     Global Dependencies:
         - corpus
         - args
     """
+    if resume != "":
+        model = torch.load(resume)
+        for param in model.parameters():
+          param.requires_grad = False
+          if param.shape[0] == ntoken and param.shape[1] >= 1:
+            param.requires_grad = True
+          print (param.shape, param.requires_grad)
+        return model
+      
     # noise for soise sampling in NCE
     noise = build_unigram_noise(
         torch.FloatTensor(corpus.vocab.idx2count)
@@ -106,7 +115,7 @@ def build_model():
     logger.info('model definition:\n %s', model)
     return model
 
-model = build_model()
+model = build_model(args.resume)
 sep_target = args.index_module == 'linear'
 #################################################################
 # Training code

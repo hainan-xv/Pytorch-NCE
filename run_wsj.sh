@@ -1,11 +1,11 @@
 #!/bin/bash
 
-loss=full
+loss=sampled_povey
 data=data/wsj
 d=wsj
 batch_size=64
 dropout=0.2
-noise_ratio=512
+noise_ratio=256
 lr=0.001
 concat=true
 sample_with_replacement=false

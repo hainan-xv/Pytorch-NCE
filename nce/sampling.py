@@ -140,6 +140,8 @@ class BandedSampler(torch.nn.Module):
     self.shuffle()
     self.counter = 0
 
+    self.inclusion_probs = self.inclusion_probs.cuda()
+
   def normalize(self):
     if self.num_samples == len(self.probs):
       self.inclusion_probs = self.inclusion_probs * 0.0 + 1.0

@@ -114,6 +114,7 @@ class NCELoss(nn.Module):
         self.loss_type = loss_type
         self.sample_with_replacement = sample_with_replacement
         self.grouping = grouping
+        self.noise = self.noise.cuda()
 
     def forward(self, target, *args, **kwargs):
         """compute the loss with output and the desired target
@@ -157,6 +158,7 @@ class NCELoss(nn.Module):
                     prob_noise, prob_target_in_noise,
                 )
             elif self.loss_type == 'sampled_povey':
+#                print (score_noise)
                 loss, real_loss = self.sampled_povey_loss(
                     score_model, score_noise_in_model,
                     score_noise, torch.zeros_like(score_target_in_noise),
@@ -262,9 +264,9 @@ class NCELoss(nn.Module):
             noise_samples = self.alias.draw(1, 1, self.noise_ratio).expand(batch_size, max_len, self.noise_ratio)
           else:
             if self.grouping:
-              noise_samples = self.group_sampler.draw(1, 1, self.noise_ratio).expand(batch_size, max_len, self.noise_ratio)
+              noise_samples = self.group_sampler.draw(1, 1, self.noise_ratio).expand(batch_size, max_len, self.noise_ratio).cuda()
             else:
-              noise_samples = self.banded_sampler.draw(1, 1, self.noise_ratio).expand(batch_size, max_len, self.noise_ratio)
+              noise_samples = self.banded_sampler.draw(1, 1, self.noise_ratio).expand(batch_size, max_len, self.noise_ratio).cuda()
 
         noise_samples = Variable(noise_samples).contiguous()
         return noise_samples
@@ -350,6 +352,8 @@ class NCELoss(nn.Module):
     def sampled_povey_loss(self, score_model, score_noise_in_model, score_noise, score_target_in_noise):
         """Compute the sampled softmax loss based on the tensorflow's impl"""
         logits = torch.cat([score_model.unsqueeze(2), score_noise_in_model], dim=2)
+#        print (score_target_in_noise.unsqueeze(2))
+#        print (score_noise)
         q_logits = torch.cat([score_target_in_noise.unsqueeze(2), score_noise], dim=2)
         logits = logits - q_logits
         labels = torch.zeros_like(logits.narrow(2, 0, 1)).squeeze(2).long()

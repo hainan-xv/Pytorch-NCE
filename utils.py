@@ -11,6 +11,8 @@ def setup_parser():
         description='PyTorch PennTreeBank NCE Language Model')
     parser.add_argument('--data', type=str, default='./data/penn',
                         help='location of the data corpus')
+    parser.add_argument('--resume', type=str, default='',
+                        help='resume from trained model')
     parser.add_argument('--vocab', type=str, default=None,
                         help='location of the vocabulary file, without which will use vocab of training corpus')
     parser.add_argument('--min-freq', type=int, default=1,

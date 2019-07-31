@@ -1,6 +1,6 @@
 #!/bin/bash
 
-loss=full
+loss=sampled_povey
 data=data/ami
 batch_size=64
 dropout=0.4
@@ -10,7 +10,7 @@ concat=true
 sample_with_replacement=false
 sample_with_grouping=false
 emsize=200
-epochs=20
+epochs=200
 nlayers=2
 log_interval=20
 norm_term=1.0
@@ -47,7 +47,7 @@ python3 -u main.py $concat $sample_with_replacement $sample_with_grouping --data
 best_epoch=`grep "valid ppl" saved_model/$dir/log.train | awk '{print NR, $3}' | sed "s=,==g" | sort -k2n | head -n1 | awk '{print $1}'`
 best_loss=`grep "valid ppl" saved_model/$dir/log.train | awk '{print NR, $3}' | sed "s=,==g" | sort -k2n | head -n1 | awk '{print $2}'`
 
-mv $data/vocab.pkl saved_model/$dir
+cp $data/vocab.pkl saved_model/$dir
 echo $best_loss > saved_model/$dir/best_loss
 
 rm -f $PWD/saved_model/$dir/best.mdl
