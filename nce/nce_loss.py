@@ -132,7 +132,9 @@ class NCELoss(nn.Module):
             if self.sample_with_replacement:
               score_noise = Variable(
                   self.noise[noise_samples.data.view(-1)].view_as(noise_samples)
-              ).log() + math.log(self.noise_ratio)
+              ).log()
+              if self.loss_type != 'nce':
+                score_noise = score_noise + math.log(self.noise_ratio)
             else:
               score_noise = Variable(self.banded_sampler.inclusion_probs[noise_samples.data.view(-1)].view_as(noise_samples)).log()
 
@@ -145,20 +147,20 @@ class NCELoss(nn.Module):
 
             if self.loss_type == 'nce':
                 if self.training:
-                    loss = self.nce_loss(
-                        prob_model, prob_noise_in_model,
-                        prob_noise, prob_target_in_noise,
+                    loss, real_loss = self.nce_loss(
+                        score_model, score_noise_in_model,
+#                        score_noise, score_target_in_noise,
+                        score_noise, torch.zeros_like(score_target_in_noise),
                     )
                 else:
                     # directly output the approximated posterior
-                    loss = - prob_model.log()
+                    loss, real_loss = - prob_model.log()
             elif self.loss_type == 'sampled':
                 loss = self.sampled_softmax_loss(
                     prob_model, prob_noise_in_model,
                     prob_noise, prob_target_in_noise,
                 )
             elif self.loss_type == 'sampled_povey':
-#                print (score_noise)
                 loss, real_loss = self.sampled_povey_loss(
                     score_model, score_noise_in_model,
                     score_noise, torch.zeros_like(score_target_in_noise),
@@ -309,7 +311,7 @@ class NCELoss(nn.Module):
         """
         raise NotImplementedError()
 
-    def nce_loss(self, prob_model, prob_noise_in_model, prob_noise, prob_target_in_noise):
+    def nce_loss(self, score_model, score_noise_in_model, score_noise, score_target_in_noise):
         """Compute the classification loss given all four probabilities
 
         Args:
@@ -322,19 +324,19 @@ class NCELoss(nn.Module):
             - loss: a mis-classification loss for every single case
         """
 
-        p_model = torch.cat([prob_model.unsqueeze(2), prob_noise_in_model], dim=2).clamp(BACKOFF_PROB, 1)
-        p_noise = torch.cat([prob_target_in_noise.unsqueeze(2), prob_noise], dim=2).clamp(BACKOFF_PROB, 1)
+        p_model = torch.cat([score_model.unsqueeze(2), score_noise_in_model], dim=2).exp()
+        p_noise = torch.cat([score_target_in_noise.unsqueeze(2), score_noise], dim=2).exp()
 
         # predicted probability of the word comes from true data distribution
         p_true = p_model / (p_model + self.noise_ratio * p_noise)
         label = torch.cat(
-            [torch.ones_like(prob_model).unsqueeze(2),
-             torch.zeros_like(prob_noise)], dim=2
+            [torch.ones_like(score_model).unsqueeze(2),
+             torch.zeros_like(score_noise)], dim=2
         )
 
         loss = self.bce(p_true, label).sum(dim=2)
 
-        return loss
+        return loss, loss
 
     def sampled_softmax_loss(self, prob_model, prob_noise_in_model, prob_noise, prob_target_in_noise):
         """Compute the sampled softmax loss based on the tensorflow's impl"""

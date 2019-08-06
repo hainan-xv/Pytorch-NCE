@@ -1,16 +1,16 @@
 #!/bin/bash
 
-loss=sampled_povey
+loss=nce
 data=data/ami
 batch_size=64
 dropout=0.4
 noise_ratio=512
 lr=0.001
 concat=true
-sample_with_replacement=false
+sample_with_replacement=true
 sample_with_grouping=false
 emsize=200
-epochs=200
+epochs=20
 nlayers=2
 log_interval=20
 norm_term=1.0
