@@ -1,6 +1,6 @@
 #!/bin/bash
 
-loss=nce
+loss=regularized
 data=data/ami
 batch_size=64
 dropout=0.4
@@ -10,12 +10,13 @@ concat=true
 sample_with_replacement=true
 sample_with_grouping=false
 emsize=200
-epochs=200
+epochs=20
 nlayers=2
 log_interval=20
 norm_term=1.0
 normalize=0
 trick=0
+theta=1.0
 
 . parse_options.sh
 
@@ -39,11 +40,11 @@ fi
 
 export CUDA_VISIBLE_DEVICES=`free-gpu`
 
-dir=ami_${loss}_${batch_size}_${dropout}_${noise_ratio}_${lr}_${nlayers}_${norm_term}_${normalize}_${trick}
+dir=ami_${loss}_${batch_size}_${dropout}_${noise_ratio}_${lr}_${nlayers}_${norm_term}_${normalize}_${trick}_$theta
 mkdir -p saved_model/$dir
 mkdir -p log/$dir
 
-python3 -u main.py $concat $sample_with_replacement $sample_with_grouping --data $data --norm-term $norm_term --log-interval $log_interval --nlayers $nlayers --epochs $epochs --emsize $emsize --lr $lr --batch-size $batch_size --cuda --loss $loss --train --noise-ratio $noise_ratio --save $dir/model 2>&1 | tee saved_model/$dir/log.train
+python3 -u main.py $concat $sample_with_replacement $sample_with_grouping --theta $theta --data $data --norm-term $norm_term --log-interval $log_interval --nlayers $nlayers --epochs $epochs --emsize $emsize --lr $lr --batch-size $batch_size --cuda --loss $loss --train --noise-ratio $noise_ratio --save $dir/model 2>&1 | tee saved_model/$dir/log.train
 best_epoch=`grep "valid ppl" saved_model/$dir/log.train | awk '{print NR, $3}' | sed "s=,==g" | sort -k2n | head -n1 | awk '{print $1}'`
 best_loss=`grep "valid ppl" saved_model/$dir/log.train | awk '{print NR, $3}' | sed "s=,==g" | sort -k2n | head -n1 | awk '{print $2}'`
 

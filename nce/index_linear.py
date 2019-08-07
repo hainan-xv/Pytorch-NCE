@@ -150,7 +150,7 @@ class IndexLinear(NCELoss):
         ).view_as(target_idx)
         return loss
 
-    def regularized_loss(self, target_idx, input):
+    def regularized_loss(self, target_idx, input, theta=1.0):
         score = F.linear(input, self.emb.weight, self.bias.weight.squeeze(1))  # (N, V)
         loss_ce = self.ce(
             score.view(-1, score.size(-1)),
@@ -163,7 +163,7 @@ class IndexLinear(NCELoss):
         ).view_as(target_idx)
 
         norm_terms = (loss_nll - loss_ce) ** 2
-        return loss_ce + norm_terms * 0.1
+        return loss_ce + norm_terms * self.theta, loss_ce
 
     def povey_loss(self, target_idx, input):
         score = F.linear(input, self.emb.weight, self.bias.weight.squeeze(1))  # (N, V)

@@ -83,6 +83,7 @@ def build_model(resume):
             noise=noise,
             noise_ratio=args.noise_ratio,
             norm_term=norm_term,
+            theta=args.theta,
             loss_type=args.loss,
             reduction='none',
             sample_with_replacement=args.sample_with_replacement,

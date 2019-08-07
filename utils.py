@@ -63,6 +63,8 @@ def setup_parser():
                         ' is shared among batch')
     parser.add_argument('--norm-term', type=float, default=1.0,
                         help='set the log normalization term of NCE sampling')
+    parser.add_argument('--theta', type=float, default=1.0,
+                        help='theta for variance regularization')
     parser.add_argument('--train', action='store_true',
                         help='set train mode, otherwise only evaluation is'
                         ' performed')

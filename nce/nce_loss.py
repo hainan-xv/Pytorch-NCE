@@ -86,6 +86,7 @@ class NCELoss(nn.Module):
                  noise,
                  noise_ratio=100,
                  norm_term=1.0,
+                 theta=1.0,
                  reduction='elementwise_mean',
                  per_word=False,
                  loss_type='nce',
@@ -103,6 +104,8 @@ class NCELoss(nn.Module):
             self.norm_term = math.log(noise.numel())
         else:
             self.norm_term = norm_term
+
+        self.theta=theta
         self.reduction = reduction
         self.per_word = per_word
         self.bce = nn.BCELoss(reduction='none')
@@ -188,7 +191,7 @@ class NCELoss(nn.Module):
             loss, real_loss = self.povey_loss(target, *args, **kwargs)
         elif self.loss_type == 'regularized':
             # Fallback into conventional cross entropy
-            loss = self.regularized_loss(target, *args, **kwargs)
+            loss, real_loss = self.regularized_loss(target, theta=self.theta, *args, **kwargs)
 
         if self.reduction == 'elementwise_mean':
             return loss.mean()
